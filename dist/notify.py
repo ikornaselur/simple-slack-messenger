@@ -4,11 +4,7 @@ import os
 import tempfile
 import time
 import urllib.request
-from typing import Any, Dict, List, Optional, TypedDict
-
-#########
-# Types #
-#########
+from typing import Dict, List, Optional, TypedDict
 
 
 class Text(TypedDict):
@@ -31,11 +27,6 @@ class Payload(PayloadBase, total=False):
     ts: str
 
 
-#########
-# Utils #
-#########
-
-
 def set_block_state(
     blocks: List[Block], environment: str, step: str, state: str
 ) -> List[Block]:
@@ -56,11 +47,6 @@ def set_block_state(
     blocks[block_idx]["text"]["text"] = f"*{step}*: {state}"
 
     return blocks
-
-
-###########
-# Classes #
-###########
 
 
 class Slack:
@@ -140,7 +126,7 @@ class Slack:
 
 
 class Messenger:
-    """ An opinionated messenger class to post and update messages regarding deployments
+    """ An opinionated messenger to post and update messages regarding deployments
 
     Has two main methods.
 
@@ -160,7 +146,7 @@ class Messenger:
     channel: str
     verbose: bool
 
-    def __init__(self, channel: str, message_id: str, verbose=False) -> None:
+    def __init__(self, channel: str, message_id: str, verbose: bool = False) -> None:
         self.slack = Slack(os.environ["SLACK_TOKEN"])
         self.channel = channel
         self.tmp_dir = tempfile.gettempdir()

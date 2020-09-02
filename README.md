@@ -1,4 +1,4 @@
-# Simple Slack messager
+# Simple Slack messenger
 
 A script that support sending messages to Slack from command line, with just
 Python 3 and a Slack Bot token. There are no Python dependencies, other than

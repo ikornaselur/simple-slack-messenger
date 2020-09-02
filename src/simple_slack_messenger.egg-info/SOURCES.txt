@@ -1,0 +1,13 @@
+README.md
+setup.cfg
+setup.py
+src/simple_slack_messenger/__init__.py
+src/simple_slack_messenger/cli.py
+src/simple_slack_messenger/messenger.py
+src/simple_slack_messenger/slack.py
+src/simple_slack_messenger/types.py
+src/simple_slack_messenger/utils.py
+src/simple_slack_messenger.egg-info/PKG-INFO
+src/simple_slack_messenger.egg-info/SOURCES.txt
+src/simple_slack_messenger.egg-info/dependency_links.txt
+src/simple_slack_messenger.egg-info/top_level.txt
