@@ -64,3 +64,26 @@ Search for Llamas: :loading: In progress...
 Normalize power: Not started
 Reticulate splines: Not started
 ```
+
+A simple script to simulate usage
+
+```bash
+#!/bin/bash
+notify.py create unique_id "Search for Llamas" "Normalize power" "Reticulate splines" --header Production
+
+notify.py update unique_id "Search for Llamas" ":loading: In progress..."
+sleep 2
+notify.py update unique_id "Search for Llamas" ":heavy_check_mark: done!"
+
+sleep 1
+
+notify.py update unique_id "Normalize power" ":loading: In progress..."
+sleep 2
+notify.py update unique_id "Normalize power" ":heavy_check_mark: done!"
+
+sleep 1
+
+notify.py update unique_id "Reticulate splines" ":loading: In progress..."
+sleep 2
+notify.py update unique_id "Reticulate splines" ":heavy_check_mark: done!"
+```
