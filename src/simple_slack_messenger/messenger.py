@@ -32,7 +32,7 @@ class Messenger:
     def __init__(self, channel: str, message_id: str, verbose: bool = False) -> None:
         self.slack = Slack(os.environ["SLACK_TOKEN"])
         self.channel = channel
-        self.tmp_dir = tempfile.gettempdir()
+        self.tmp_dir = os.path.join(tempfile.gettempdir(), "simple_slack_messenger")
         self.message_id = message_id
         self.verbose = verbose
 
@@ -40,9 +40,10 @@ class Messenger:
             print(f"temp dir: {self.tmp_dir}")
 
     def _write(self, payload: Dict) -> None:
-        with open(
-            os.path.join(self.tmp_dir, "simple_slack_messenger", self.message_id), "w"
-        ) as f:
+        if not os.path.exists(self.tmp_dir):
+            os.mkdir(self.tmp_dir)
+
+        with open(os.path.join(self.tmp_dir, self.message_id), "w") as f:
             json.dump(payload, f)
 
     def _read(self) -> Dict:

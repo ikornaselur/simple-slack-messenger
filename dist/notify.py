@@ -144,7 +144,7 @@ class Messenger:
     def __init__(self, channel: str, message_id: str, verbose: bool = False) -> None:
         self.slack = Slack(os.environ["SLACK_TOKEN"])
         self.channel = channel
-        self.tmp_dir = tempfile.gettempdir()
+        self.tmp_dir = os.path.join(tempfile.gettempdir(), "simple_slack_messenger")
         self.message_id = message_id
         self.verbose = verbose
 
@@ -152,9 +152,10 @@ class Messenger:
             print(f"temp dir: {self.tmp_dir}")
 
     def _write(self, payload: Dict) -> None:
-        with open(
-            os.path.join(self.tmp_dir, "simple_slack_messenger", self.message_id), "w"
-        ) as f:
+        if not os.path.exists(self.tmp_dir):
+            os.mkdir(self.tmp_dir)
+
+        with open(os.path.join(self.tmp_dir, self.message_id), "w") as f:
             json.dump(payload, f)
 
     def _read(self) -> Dict:
@@ -212,9 +213,7 @@ class Messenger:
 
 
 def create(args: argparse.Namespace) -> None:
-    messenger = Messenger(
-        channel=os.environ["SLACK_CHANNEL"], message_id=args.id, verbose=True
-    )
+    messenger = Messenger(channel=os.environ["SLACK_CHANNEL"], message_id=args.id)
 
     messenger.create_deployment(
         steps=args.step, initial_state=args.initial_state, header=args.header
@@ -222,9 +221,7 @@ def create(args: argparse.Namespace) -> None:
 
 
 def update(args: argparse.Namespace) -> None:
-    messenger = Messenger(
-        channel=os.environ["SLACK_CHANNEL"], message_id=args.id, verbose=True
-    )
+    messenger = Messenger(channel=os.environ["SLACK_CHANNEL"], message_id=args.id)
 
     messenger.update_deployment(step=args.step, state=args.state)
 
@@ -233,10 +230,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Post an editable deployment message on Slack"
     )
-    subparsers = parser.add_subparsers(help="sub-command help")
+    parser.add_argument(
+        "--error",
+        action="store_false",
+        help=(
+            "If not provided, the script will ignore all errors, "
+            "to prevent the script from blocking a CI run for example"
+        ),
+    )
+    subparsers = parser.add_subparsers()
 
     # Create
-    create_parser = subparsers.add_parser("create", help="create help")
+    create_parser = subparsers.add_parser("create", help="Create a deployment message")
     create_parser.add_argument(
         "id", help="A unique id for the deployment, used for updating"
     )
@@ -251,7 +256,7 @@ if __name__ == "__main__":
     create_parser.set_defaults(func=create)
 
     # Update
-    update_parser = subparsers.add_parser("update", help="update help")
+    update_parser = subparsers.add_parser("update", help="Update an existing one")
     update_parser.add_argument(
         "id", help="A unique id for the deployment, used when message was created"
     )
@@ -260,4 +265,10 @@ if __name__ == "__main__":
     update_parser.set_defaults(func=update)
 
     args = parser.parse_args()
-    args.func(args)
+    if args.error:
+        args.func(args)
+    else:
+        try:
+            args.func(args)
+        except Exception as e:
+            print(f"Encountered error: {e}")
