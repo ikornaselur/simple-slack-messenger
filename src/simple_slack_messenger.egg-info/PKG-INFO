@@ -1,0 +1,11 @@
+Metadata-Version: 1.2
+Name: simple-slack-messenger
+Version: 0.1.0
+Summary: A script, with no Python dependencies, to post and edit a Slack message
+Home-page: UNKNOWN
+Author: Axel
+Author-email: dev@absalon.is
+License: UNKNOWN
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires-Python: >=3.8,<4.0
