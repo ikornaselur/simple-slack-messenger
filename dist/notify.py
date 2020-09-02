@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import os
 import tempfile
-import time
 import urllib.request
 from typing import Dict, List, Optional, TypedDict
 
@@ -27,17 +27,12 @@ class Payload(PayloadBase, total=False):
     ts: str
 
 
-def set_block_state(
-    blocks: List[Block], environment: str, step: str, state: str
-) -> List[Block]:
-    """ Find the block based on environment and step and set the state """
+def set_block_state(blocks: List[Block], step: str, state: str) -> List[Block]:
+    """ Find the block based on step and set the state """
     block_idx = -1
-    environment_section = False
 
     for idx, block in enumerate(blocks):
-        if block["text"]["text"] == environment:
-            environment_section = True
-        if environment_section and f"*{step}*" in block["text"]["text"]:
+        if f"*{step}*" in block["text"]["text"]:
             block_idx = idx
             break
 
@@ -149,14 +144,30 @@ class Messenger:
     def __init__(self, channel: str, message_id: str, verbose: bool = False) -> None:
         self.slack = Slack(os.environ["SLACK_TOKEN"])
         self.channel = channel
-        self.tmp_dir = tempfile.gettempdir()
+        self.tmp_dir = os.path.join(tempfile.gettempdir(), "simple_slack_messenger")
         self.message_id = message_id
         self.verbose = verbose
 
         if self.verbose:
             print(f"temp dir: {self.tmp_dir}")
 
-    def create_deployment(self, environments: List[str], steps: List[str]) -> Dict:
+    def _write(self, payload: Dict) -> None:
+        if not os.path.exists(self.tmp_dir):
+            os.mkdir(self.tmp_dir)
+
+        with open(os.path.join(self.tmp_dir, self.message_id), "w") as f:
+            json.dump(payload, f)
+
+    def _read(self) -> Dict:
+        with open(os.path.join(self.tmp_dir, self.message_id), "r") as f:
+            return json.load(f)
+
+    def create_deployment(
+        self,
+        steps: List[str],
+        initial_state: str = "Not started",
+        header: Optional[str] = None,
+    ) -> None:
         blocks: List[Block] = [
             {
                 "type": "section",
@@ -166,64 +177,98 @@ class Messenger:
                 },
             }
         ]
-        for environment in environments:
+        if header:
             blocks.append(
-                {"type": "header", "text": {"type": "plain_text", "text": environment}}
+                {"type": "header", "text": {"type": "plain_text", "text": header}}
             )
-            for step in steps:
-                blocks.append(
-                    {
-                        "type": "section",
-                        "text": {"type": "mrkdwn", "text": f"*{step}*: Not started"},
-                    },
-                )
-        return self.slack.post_message(self.channel, blocks=blocks)
 
-    def update_deployment(
-        self,
-        ts: str,
-        *,
-        text: Optional[str] = None,
-        blocks: Optional[List[Block]] = None,
-    ) -> Dict:
-        return self.slack.edit_message(
+        for step in steps:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"*{step}*: {initial_state}"},
+                },
+            )
+        response = self.slack.post_message(self.channel, blocks=blocks)
+
+        # Write response to disk to be able to reuse it
+        self._write(response)
+
+    def update_deployment(self, *, step: str, state: str) -> None:
+        # Get the previous from disk
+        response = self._read()
+
+        ts = response["ts"]
+        blocks = response["message"]["blocks"]
+        text = response["message"]["text"]
+
+        blocks = set_block_state(blocks, step=step, state=state)
+
+        update_response = self.slack.edit_message(
             channel=self.channel, ts=ts, text=text, blocks=blocks
         )
 
+        # Write updated response to disk
+        self._write(update_response)
 
-if __name__ == "__main__":
-    messenger = Messenger(
-        channel=os.environ["SLACK_CHANNEL"], message_id="deployment-test", verbose=True
+
+def create(args: argparse.Namespace) -> None:
+    messenger = Messenger(channel=os.environ["SLACK_CHANNEL"], message_id=args.id)
+
+    messenger.create_deployment(
+        steps=args.step, initial_state=args.initial_state, header=args.header
     )
 
-    envs = ["Dev", "Staging"]
-    steps = ["Migrations", "Deploy", "Other things", "Extra stuff"]
 
-    result = messenger.create_deployment(environments=envs, steps=steps)
+def update(args: argparse.Namespace) -> None:
+    messenger = Messenger(channel=os.environ["SLACK_CHANNEL"], message_id=args.id)
 
-    channel_id = result["channel"]
-    ts = result["ts"]
-    blocks = result["message"]["blocks"]
-    text = result["message"]["text"]
+    messenger.update_deployment(step=args.step, state=args.state)
 
-    # Simulate waits for testing
-    for environment in envs:
-        time.sleep(1)
-        for step in steps:
-            blocks = set_block_state(
-                blocks,
-                environment=environment,
-                step=step,
-                state=":loading: In progress...",
-            )
-            response = messenger.update_deployment(ts, blocks=blocks)
-            time.sleep(1)
-            blocks = set_block_state(
-                blocks,
-                environment=environment,
-                step=step,
-                state=":heavy_check_mark: Done!",
-            )
 
-    blocks[0]["text"]["text"] = "The deployment has been finished"
-    messenger.update_deployment(ts, blocks=blocks)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Post an editable deployment message on Slack"
+    )
+    parser.add_argument(
+        "--error",
+        action="store_false",
+        help=(
+            "If not provided, the script will ignore all errors, "
+            "to prevent the script from blocking a CI run for example"
+        ),
+    )
+    subparsers = parser.add_subparsers()
+
+    # Create
+    create_parser = subparsers.add_parser("create", help="Create a deployment message")
+    create_parser.add_argument(
+        "id", help="A unique id for the deployment, used for updating"
+    )
+    create_parser.add_argument("step", nargs="+", help="Steps in the deployment")
+    create_parser.add_argument(
+        "--initial-state",
+        "-i",
+        default="Not started",
+        help="The initial state of each step (default: Not started)",
+    )
+    create_parser.add_argument("--header", "-e", help="Optional header")
+    create_parser.set_defaults(func=create)
+
+    # Update
+    update_parser = subparsers.add_parser("update", help="Update an existing one")
+    update_parser.add_argument(
+        "id", help="A unique id for the deployment, used when message was created"
+    )
+    update_parser.add_argument("step", help="Which step to update")
+    update_parser.add_argument("state", help="The new state of the step")
+    update_parser.set_defaults(func=update)
+
+    args = parser.parse_args()
+    if args.error:
+        args.func(args)
+    else:
+        try:
+            args.func(args)
+        except Exception as e:
+            print(f"Encountered error: {e}")

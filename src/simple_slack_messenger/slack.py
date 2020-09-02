@@ -2,7 +2,7 @@ import json
 import urllib.request
 from typing import Dict, List, Optional
 
-from simple_slack_messenger.types import Payload, Block
+from simple_slack_messenger.local_types import Payload, Block
 
 
 class Slack:

@@ -1,14 +1,10 @@
 .PHONY: dist
 
-run:
-	poetry run python ./notify.py
-
-
 dist:
 	@rm -rf dist
 	@mkdir dist
 	@echo "Concatenating files..."
-	@cat src/simple_slack_messenger/types.py >> dist/_notify.py
+	@cat src/simple_slack_messenger/local_types.py >> dist/_notify.py
 	@cat src/simple_slack_messenger/utils.py >> dist/_notify.py
 	@cat src/simple_slack_messenger/slack.py >> dist/_notify.py
 	@cat src/simple_slack_messenger/messenger.py >> dist/_notify.py
