@@ -1,43 +1,56 @@
+import argparse
 import os
-import time
 
 from simple_slack_messenger.messenger import Messenger
-from simple_slack_messenger.utils import set_block_state
+
+
+def create(args: argparse.Namespace) -> None:
+    messenger = Messenger(
+        channel=os.environ["SLACK_CHANNEL"], message_id=args.id, verbose=True
+    )
+
+    messenger.create_deployment(
+        steps=args.step, initial_state=args.initial_state, header=args.header
+    )
+
+
+def update(args: argparse.Namespace) -> None:
+    messenger = Messenger(
+        channel=os.environ["SLACK_CHANNEL"], message_id=args.id, verbose=True
+    )
+
+    messenger.update_deployment(step=args.step, state=args.state)
 
 
 if __name__ == "__main__":
-    messenger = Messenger(
-        channel=os.environ["SLACK_CHANNEL"], message_id="deployment-test", verbose=True
+    parser = argparse.ArgumentParser(
+        description="Post an editable deployment message on Slack"
     )
+    subparsers = parser.add_subparsers(help="sub-command help")
 
-    envs = ["Dev", "Staging"]
-    steps = ["Migrations", "Deploy", "Other things", "Extra stuff"]
+    # Create
+    create_parser = subparsers.add_parser("create", help="create help")
+    create_parser.add_argument(
+        "id", help="A unique id for the deployment, used for updating"
+    )
+    create_parser.add_argument("step", nargs="+", help="Steps in the deployment")
+    create_parser.add_argument(
+        "--initial-state",
+        "-i",
+        default="Not started",
+        help="The initial state of each step (default: Not started)",
+    )
+    create_parser.add_argument("--header", "-e", help="Optional header")
+    create_parser.set_defaults(func=create)
 
-    result = messenger.create_deployment(environments=envs, steps=steps)
+    # Update
+    update_parser = subparsers.add_parser("update", help="update help")
+    update_parser.add_argument(
+        "id", help="A unique id for the deployment, used when message was created"
+    )
+    update_parser.add_argument("step", help="Which step to update")
+    update_parser.add_argument("state", help="The new state of the step")
+    update_parser.set_defaults(func=update)
 
-    channel_id = result["channel"]
-    ts = result["ts"]
-    blocks = result["message"]["blocks"]
-    text = result["message"]["text"]
-
-    # Simulate waits for testing
-    for environment in envs:
-        time.sleep(1)
-        for step in steps:
-            blocks = set_block_state(
-                blocks,
-                environment=environment,
-                step=step,
-                state=":loading: In progress...",
-            )
-            response = messenger.update_deployment(ts, blocks=blocks)
-            time.sleep(1)
-            blocks = set_block_state(
-                blocks,
-                environment=environment,
-                step=step,
-                state=":heavy_check_mark: Done!",
-            )
-
-    blocks[0]["text"]["text"] = "The deployment has been finished"
-    messenger.update_deployment(ts, blocks=blocks)
+    args = parser.parse_args()
+    args.func(args)
