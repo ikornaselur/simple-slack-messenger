@@ -1,9 +1,5 @@
 .PHONY: dist
 
-run:
-	poetry run python ./notify.py
-
-
 dist:
 	@rm -rf dist
 	@mkdir dist
